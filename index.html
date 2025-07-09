@@ -187,7 +187,7 @@
                 console.log('Model loaded successfully!');
             } catch (error) {
                 document.getElementById('result').innerHTML =
-                    <div class="error">❌ Error loading model: ${error.message}</div>;
+                    `<div class="error">❌ Error loading model: ${error.message}</div>`;
                 console.error('Model loading failed:', error);
             }
         }
@@ -299,8 +299,9 @@
                 resultDiv.innerHTML = html;
 
             } catch (error) {
+                
                 loadingDiv.style.display = 'none';
-                resultDiv.innerHTML = <div class="error">❌ Prediction error: ${error.message}</div>;
+                resultDiv.innerHTML = `<div class="error">❌ Prediction error: ${error.message}</div>`;
                 console.error('Prediction failed:', error);
             }
         }
