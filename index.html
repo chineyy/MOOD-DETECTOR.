@@ -3,6 +3,56 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Live Mood Classifier</title>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.11.0/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js"></script>
+<style>
+body { font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; background: #f0f4f8; margin: 0; }
+.card { background: white; border-radius: 16px; box-shadow: 0 8px 20px rgba(0,0,0,0.08); padding: 20px; width: 90%; max-width: 400px; text-align: center; }
+button { background: linear-gradient(to right, #4facfe, #00f2fe); border: none; color: white; padding: 12px 20px; margin: 10px; border-radius: 8px; font-size: 16px; cursor: pointer; transition: transform 0.2s; }
+button:hover { transform: scale(1.05); }
+#result { margin-top: 20px; font-size: 18px; color: #333; min-height: 60px; }
+video, img { width: 100%; border-radius: 12px; margin-top: 15px; }
+.shimmer { height: 20px; background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 8px; margin: 8px 0; }
+@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+</style>
+</head>
+<body>
+<div class="card">
+<h2>Live Mood Classifier</h2>
+<button id="upload-btn">Upload Image</button>
+<button id="webcam-btn">Use Webcam Live</button>
+<input type="file" id="file-input" accept="image/*" style="display:none;" />
+<img id="image-preview" style="display:none;" />
+<video id="webcam" autoplay playsinline style="display:none;"></video>
+<div id="result">Results will appear here</div>
+</div>
+<script>
+let model, webcamStream, animationId;
+const uploadBtn = document.getElementById('upload-btn');
+const webcamBtn = document.getElementById('webcam-btn');
+const fileInput = document.getElementById('file-input');
+const imagePreview = document.getElementById('image-preview');
+const webcam = document.getElementById('webcam');
+const resultDiv = document.getElementById('result');
+
+async function loadModel() { model = await tmImage.load('./model.json', './metadata.json'); }
+
+uploadBtn.onclick = () => { stopWebcam(); fileInput.click(); };
+fileInput.onchange = () => { const file = fileInput.files[0]; if (file) { imagePreview.src = URL.createObjectURL(file); imagePreview.style.display = 'block'; webcam.style.display = 'none'; predictImage(); } };
+webcamBtn.onclick = async () => { stopWebcam(); imagePreview.style.display = 'none'; webcam.style.display = 'block'; webcamStream = await navigator.mediaDevices.getUserMedia({ video: true }); webcam.srcObject = webcamStream; startLivePrediction(); };
+async function predictImage() { resultDiv.innerHTML = '<div class="shimmer"></div><div class="shimmer"></div>'; const img = new Image(); img.src = imagePreview.src; img.onload = async () => { const predictions = await model.predict(img); displayPrediction(predictions); }; }
+async function startLivePrediction() { function loop() { const tempCanvas = document.createElement('canvas'); tempCanvas.width = webcam.videoWidth; tempCanvas.height = webcam.videoHeight; const ctx = tempCanvas.getContext('2d'); ctx.drawImage(webcam, 0, 0); model.predict(tempCanvas).then(predictions => { displayPrediction(predictions); }); animationId = requestAnimationFrame(loop); } loop(); }
+function displayPrediction(predictions) { predictions.sort((a, b) => b.probability - a.probability); resultDiv.innerHTML = predictions.map(p => `${p.className}: ${(p.probability * 100).toFixed(1)}%`).join('<br>'); }
+function stopWebcam() { if (webcamStream) { webcamStream.getTracks().forEach(track => track.stop()); webcamStream = null; } if (animationId) { cancelAnimationFrame(animationId); animationId = null; } webcam.style.display = 'none'; resultDiv.textContent = 'Results will appear here'; }
+window.onload = loadModel;
+</script>
+</body>
+</html><!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Simple Mood Classifier</title>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.11.0/dist/tf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js"></script>
