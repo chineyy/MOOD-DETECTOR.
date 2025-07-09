@@ -1,4 +1,75 @@
 <!DOCTYPE html>
+<html>
+<head>
+    <title>Teachable Machine Webcam Demo</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/teachable-machine"></script>
+</head>
+<body>
+    <h1>Teachable Machine Webcam Demo</h1>
+    <button id="start-webcam">Start Webcam</button>
+    <button id="stop-webcam" disabled>Stop Webcam</button>
+    <button id="predict-button" disabled>Predict</button>
+    <div id="webcam-container"></div>
+    <div id="result"></div>
+
+    <script>
+        let model, webcam;
+
+        async function init() {
+            model = await tmImage.load('./model.json', './metadata.json');
+            console.log("Model loaded successfully");
+        }
+
+        async function startWebcam() {
+            const webcamElement = document.createElement('div');
+            webcamElement.id = 'webcam';
+            document.getElementById('webcam-container').appendChild(webcamElement);
+
+            const flip = true; // whether to flip the webcam
+            webcam = new tmImage.Webcam(400, 400, flip); // width, height, flip
+            await webcam.setup(); // request access to the webcam
+            await webcam.play();
+            document.getElementById('webcam-container').appendChild(webcam.canvas);
+            
+            document.getElementById('start-webcam').disabled = true;
+            document.getElementById('stop-webcam').disabled = false;
+            document.getElementById('predict-button').disabled = false;
+        }
+
+        async function stopWebcam() {
+            if (webcam) {
+                webcam.stop();
+                document.getElementById('webcam-container').innerHTML = '';
+                
+                document.getElementById('start-webcam').disabled = false;
+                document.getElementById('stop-webcam').disabled = true;
+                document.getElementById('predict-button').disabled = true;
+            }
+        }
+
+        async function predict() {
+            if (!webcam || !model) {
+                console.log("Webcam or model not initialized");
+                return;
+            }
+
+            const prediction = await model.predict(webcam.canvas);
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = 'Prediction: ' + prediction[0].className + 
+                                 ' with ' + (prediction[0].probability * 100).toFixed(2) + '% confidence';
+        }
+
+        // Initialize the model when the page loads
+        window.onload = init;
+
+        // Set up button event listeners
+        document.getElementById('start-webcam').addEventListener('click', startWebcam);
+        document.getElementById('stop-webcam').addEventListener('click', stopWebcam);
+        document.getElementById('predict-button').addEventListener('click', predict);
+    </script>
+</body>
+</html><!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
