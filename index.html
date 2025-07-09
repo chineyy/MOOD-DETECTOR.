@@ -10,6 +10,216 @@
     <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js"></script>
     
     <style>
+        /* [Previous CSS styles remain exactly the same] */
+    </style>
+</head>
+<body>
+    <!-- [Previous HTML structure remains exactly the same] -->
+
+    <script>
+        // Global variables
+        let model;
+        let uploadedImage;
+        let webcam;
+        let currentMode = 'upload';
+        let isWebcamRunning = false;
+        let predictionInterval; // For storing our prediction loop
+        
+        // Initialize model when page loads
+        async function init() {
+            try {
+                document.getElementById('loading').style.display = 'block';
+                model = await tmImage.load('./model.json', './metadata.json');
+                document.getElementById('loading').style.display = 'none';
+                console.log('Model loaded successfully!');
+                
+                setupFileHandlers();
+                setupModeToggle();
+                setupWebcamHandlers();
+            } catch (error) {
+                document.getElementById('result').innerHTML = 
+                    `<div class="error">❌ Error loading model: ${error.message}</div>`;
+                console.error('Model loading failed:', error);
+            }
+        }
+        
+        // [setupFileHandlers() function remains exactly the same]
+        
+        // [setupModeToggle() function remains exactly the same]
+        
+        // Setup webcam handlers
+        function setupWebcamHandlers() {
+            const startBtn = document.getElementById('start-webcam-btn');
+            const stopBtn = document.getElementById('stop-webcam-btn');
+            const predictBtn = document.getElementById('predict-btn');
+            const webcamView = document.getElementById('webcam-view');
+            const webcamCanvas = document.getElementById('webcam-canvas');
+            const webcamContainer = document.getElementById('webcam-container');
+            
+            startBtn.addEventListener('click', async () => {
+                try {
+                    // Request webcam access
+                    const stream = await navigator.mediaDevices.getUserMedia({ 
+                        video: { width: 400, height: 400, facingMode: "user" }, 
+                        audio: false 
+                    });
+                    
+                    // Display webcam stream
+                    webcamView.srcObject = stream;
+                    webcamContainer.style.display = 'block';
+                    isWebcamRunning = true;
+                    
+                    // Update UI
+                    startBtn.disabled = true;
+                    stopBtn.disabled = false;
+                    predictBtn.disabled = false;
+                    
+                    // Initialize webcam for Teachable Machine
+                    webcam = new tmImage.Webcam(400, 400, true);
+                    await webcam.setup();
+                    await webcam.play();
+                    
+                    webcamCanvas.width = webcam.width;
+                    webcamCanvas.height = webcam.height;
+                    
+                    // Start continuous predictions
+                    startPredictionLoop();
+                    
+                } catch (error) {
+                    document.getElementById('result').innerHTML = 
+                        `<div class="error">❌ Webcam error: ${error.message}</div>`;
+                    console.error('Webcam access failed:', error);
+                }
+            });
+            
+            stopBtn.addEventListener('click', stopWebcam);
+            
+            function stopWebcam() {
+                // Stop the prediction loop
+                stopPredictionLoop();
+                
+                if (webcam) {
+                    webcam.stop();
+                }
+                
+                const stream = document.getElementById('webcam-view').srcObject;
+                if (stream) {
+                    const tracks = stream.getTracks();
+                    tracks.forEach(track => track.stop());
+                    document.getElementById('webcam-view').srcObject = null;
+                }
+                
+                isWebcamRunning = false;
+                
+                // Update UI
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+                document.getElementById('predict-btn').disabled = true;
+                document.getElementById('webcam-container').style.display = 'none';
+            }
+        }
+        
+        // Start continuous predictions
+        function startPredictionLoop() {
+            // Clear any existing interval
+            stopPredictionLoop();
+            
+            // Make initial prediction immediately
+            updateWebcamPrediction();
+            
+            // Then set up regular predictions (e.g., every 500ms)
+            predictionInterval = setInterval(updateWebcamPrediction, 500);
+        }
+        
+        // Stop continuous predictions
+        function stopPredictionLoop() {
+            if (predictionInterval) {
+                clearInterval(predictionInterval);
+                predictionInterval = null;
+            }
+        }
+        
+        // Update prediction from webcam
+        async function updateWebcamPrediction() {
+            if (!isWebcamRunning || !webcam) return;
+            
+            try {
+                const predictions = await model.predict(webcam.canvas);
+                displayPredictions(predictions);
+            } catch (error) {
+                console.error('Prediction error:', error);
+            }
+        }
+        
+        // Display predictions (used for both webcam and upload modes)
+        function displayPredictions(predictions) {
+            let html = '<h3>Predictions:</h3>';
+            predictions.sort((a, b) => b.probability - a.probability);
+            
+            predictions.forEach(prediction => {
+                const percent = Math.round(prediction.probability * 100);
+                html += `
+                    <div class="prediction-item">
+                        <div style="flex: 1;">
+                            <strong>${prediction.className}</strong>
+                            <div>${percent}% confidence</div>
+                            <div class="confidence-bar" style="width: ${percent}%"></div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            document.getElementById('result').innerHTML = html;
+        }
+        
+        // Main prediction function (for upload mode)
+        async function predict() {
+            const resultDiv = document.getElementById('result');
+            const loadingDiv = document.getElementById('loading');
+            
+            try {
+                loadingDiv.style.display = 'block';
+                resultDiv.innerHTML = '';
+                
+                if (currentMode === 'upload' && uploadedImage) {
+                    const img = new Image();
+                    img.src = URL.createObjectURL(uploadedImage);
+                    
+                    await new Promise((resolve) => {
+                        img.onload = resolve;
+                    });
+                    
+                    const predictions = await model.predict(img);
+                    displayPredictions(predictions);
+                } 
+                else {
+                    throw new Error('No image source available for prediction');
+                }
+                
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Prediction error: ${error.message}</div>`;
+                console.error('Prediction failed:', error);
+            } finally {
+                loadingDiv.style.display = 'none';
+            }
+        }
+        
+        // Initialize when page loads
+        window.onload = init;
+    </script>
+</body>
+</html><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teachable Machine Image Classifier</title>
+    
+    <!-- Load TensorFlow.js and Teachable Machine libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.11.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js"></script>
+    
+    <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             max-width: 800px;
