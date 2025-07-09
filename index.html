@@ -1,125 +1,79 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Teachable Machine Mood Classifier</title>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.11.0/dist/tf.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js"></script>
-    <style>
-        body { font-family: sans-serif; max-width: 500px; margin: auto; padding: 20px; text-align: center; }
-        video, img { max-width: 100%; border-radius: 8px; margin: 10px 0; }
-        button { padding: 10px 20px; margin: 5px; }
-        #result { margin-top: 20px; }
-    </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Simple Mood Classifier</title>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.11.0/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js"></script>
+<style>
+body { font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; background: #f0f4f8; margin: 0; }
+.card { background: white; border-radius: 16px; box-shadow: 0 8px 20px rgba(0,0,0,0.08); padding: 20px; width: 90%; max-width: 400px; text-align: center; }
+button { background: linear-gradient(to right, #4facfe, #00f2fe); border: none; color: white; padding: 12px 20px; margin: 10px; border-radius: 8px; font-size: 16px; cursor: pointer; transition: transform 0.2s; }
+button:hover { transform: scale(1.05); }
+#result { margin-top: 20px; font-size: 18px; color: #333; }
+video, img { width: 100%; border-radius: 12px; margin-top: 15px; }
+</style>
 </head>
 <body>
-    <h1>Mood Classifier</h1>
+<div class="card">
+<h2>Mood Classifier</h2>
+<button id="upload-btn">Upload Image</button>
+<button id="webcam-btn">Use Webcam</button>
+<input type="file" id="file-input" accept="image/*" style="display:none;" />
+<img id="image-preview" style="display:none;" />
+<video id="webcam" autoplay playsinline style="display:none;"></video>
+<button id="analyze-btn" style="display:none;">Analyze</button>
+<div id="result">Results will appear here</div>
+</div>
+<script>
+let model, webcamStream;
+const uploadBtn = document.getElementById('upload-btn');
+const webcamBtn = document.getElementById('webcam-btn');
+const fileInput = document.getElementById('file-input');
+const imagePreview = document.getElementById('image-preview');
+const webcam = document.getElementById('webcam');
+const analyzeBtn = document.getElementById('analyze-btn');
+const resultDiv = document.getElementById('result');
 
-    <button id="upload-mode">Upload Image</button>
-    <button id="webcam-mode">Use Webcam</button>
+async function loadModel() {
+    model = await tmImage.load('./model.json', './metadata.json');
+}
 
-    <div id="upload-section">
-        <input type="file" id="file-upload" accept="image/*">
-        <img id="image-preview" style="display:none;">
-        <button id="predict-btn" disabled>Analyze Image</button>
-    </div>
-
-    <div id="webcam-section" style="display:none;">
-        <video id="webcam-view" autoplay playsinline width="300" height="300"></video>
-        <button id="start-webcam">Start Webcam</button>
-        <button id="stop-webcam" disabled>Stop Webcam</button>
-    </div>
-
-    <div id="result">Prediction results will appear here.</div>
-
-    <script>
-        let model, webcam, webcamInterval;
-        const predictBtn = document.getElementById('predict-btn');
-        const resultDiv = document.getElementById('result');
-        const fileUpload = document.getElementById('file-upload');
-        const imagePreview = document.getElementById('image-preview');
-        const webcamView = document.getElementById('webcam-view');
-
-        async function init() {
-            model = await tmImage.load('./model.json', './metadata.json');
-            console.log('Model loaded');
-        }
-
-        document.getElementById('upload-mode').onclick = () => {
-            document.getElementById('upload-section').style.display = 'block';
-            document.getElementById('webcam-section').style.display = 'none';
-            stopWebcam();
-        };
-
-        document.getElementById('webcam-mode').onclick = () => {
-            document.getElementById('upload-section').style.display = 'none';
-            document.getElementById('webcam-section').style.display = 'block';
-        };
-
-        fileUpload.onchange = () => {
-            const file = fileUpload.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = e => {
-                    imagePreview.src = e.target.result;
-                    imagePreview.style.display = 'block';
-                    predictBtn.disabled = false;
-                };
-                reader.readAsDataURL(file);
-            }
-        };
-
-        predictBtn.onclick = async () => {
-            resultDiv.textContent = 'Predicting...';
-            const img = new Image();
-            img.src = imagePreview.src;
-            img.onload = async () => {
-                const prediction = await model.predict(img);
-                displayPrediction(prediction);
-            };
-        };
-
-        document.getElementById('start-webcam').onclick = async () => {
-            webcam = new tmImage.Webcam(300, 300, true);
-            await webcam.setup();
-            await webcam.play();
-            webcamView.srcObject = webcam.webcam.stream;
-            document.getElementById('start-webcam').disabled = true;
-            document.getElementById('stop-webcam').disabled = false;
-            webcamInterval = requestAnimationFrame(loop);
-        };
-
-        document.getElementById('stop-webcam').onclick = () => {
-            stopWebcam();
-        };
-
-        async function loop() {
-            if (webcam) {
-                await webcam.update();
-                const prediction = await model.predict(webcam.canvas);
-                displayPrediction(prediction);
-                webcamInterval = requestAnimationFrame(loop);
-            }
-        }
-
-        function stopWebcam() {
-            if (webcam) {
-                webcam.stop();
-                webcam = null;
-                cancelAnimationFrame(webcamInterval);
-            }
-            document.getElementById('start-webcam').disabled = false;
-            document.getElementById('stop-webcam').disabled = true;
-            resultDiv.textContent = 'Webcam stopped.';
-        }
-
-        function displayPrediction(predictions) {
-            predictions.sort((a, b) => b.probability - a.probability);
-            resultDiv.innerHTML = predictions.map(p => `${p.className}: ${(p.probability * 100).toFixed(2)}%`).join('<br>');
-        }
-
-        window.onload = init;
-    </script>
+uploadBtn.onclick = () => { fileInput.click(); };
+fileInput.onchange = () => {
+    const file = fileInput.files[0];
+    if (file) {
+        imagePreview.src = URL.createObjectURL(file);
+        imagePreview.style.display = 'block';
+        webcam.style.display = 'none';
+        analyzeBtn.style.display = 'inline-block';
+    }
+};
+webcamBtn.onclick = async () => {
+    imagePreview.style.display = 'none';
+    webcam.style.display = 'block';
+    analyzeBtn.style.display = 'inline-block';
+    webcamStream = await navigator.mediaDevices.getUserMedia({ video: true });
+    webcam.srcObject = webcamStream;
+};
+analyzeBtn.onclick = async () => {
+    resultDiv.textContent = 'Analyzing...';
+    let predictions;
+    if (webcam.style.display === 'block') {
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = webcam.videoWidth;
+        tempCanvas.height = webcam.videoHeight;
+        const ctx = tempCanvas.getContext('2d');
+        ctx.drawImage(webcam, 0, 0);
+        predictions = await model.predict(tempCanvas);
+    } else if (imagePreview.style.display === 'block') {
+        predictions = await model.predict(imagePreview);
+    }
+    predictions.sort((a, b) => b.probability - a.probability);
+    resultDiv.innerHTML = predictions.map(p => `${p.className}: ${(p.probability * 100).toFixed(1)}%`).join('<br>');
+};
+window.onload = loadModel;
+</script>
 </body>
 </html>
